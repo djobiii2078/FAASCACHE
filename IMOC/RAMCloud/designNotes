@@ -1,0 +1,249 @@
+This file contains additional design notes for RAMCloud, which supplement
+the comments present in the code. This file is intended for protocols
+and other decisions that reflect themselves in many different places in the
+RAMCloud code, such that there is no obvious place to put documentation
+in the code. When this happens, there should be a comment of the following
+format each point in the code where the design decision manifests itself:
+
+// See "Foo" in designNotes.
+
+"Foo" is the name for the design note, which should appear as a header line
+in this file.
+
+If there is a logical single place to put comments in the code, then please
+do that rather than creating a design note here.
+
+Zombies
+-------
+A zombie is a server that is considered dead by the rest of the cluster;
+any data stored on the server has been recovered and will be managed by
+other servers. However, if a zombie is not actually dead (e.g. it was
+just disconnected from the other servers for a while) two forms of
+inconsistency can arise:
+* A zombie server must not serve read requests once replacement servers
+  have taken over; otherwise it may return stale data that does not reflect
+  writes accepted by the replacement servers.
+* The zombie server must not accept write request once replacement servers
+  have begun replaying its log during recovery; if it does, these writes
+  may be lost (the new values may not be stored on the replacement servers
+  and thus will not be returned by reads).
+
+RAMCloud uses two techniques to neutralize zombies. First, at the beginning of
+crash recovery the coordinator contacts every server in the cluster, notifying
+it of the crashed server. Once this happens, servers will reject backup
+requests from the crashed server with STATUS_CALLER_NOT_IN_CLUSTER errors. This
+prevents the zombie from writing new data. In addition, the zombie will then
+contact the coordinator to verify its cluster membership (just in case the
+backup's server list was out of date). If the coordinator confirms that the
+zombie is no longer part of the cluster, then the zombie commits suicide. If
+the coordinator believes that the server is still part of the cluster, then the
+server will retry its replication operation. Overall, this approach ensures
+that by the time replacement servers begin replaying log data from a crashed
+master, the master can no longer complete new write operations.
+
+Potential weakness: if for some reason the coordinator does not contact all
+servers at the beginning of crash recovery, it's possible that the zombie
+may be able to write new data using backups that aren't aware of its death.
+However, the coordinator cannot begin crash recovery unless it has contacted
+at least one backup storing each of the crashed master's segments, including
+the head segment. Thus, this failure cannot happen.
+
+The second technique is used to ensure that masters have stopped servicing
+read requests before replacement masters can service any write requests.
+This mechanism is implemented as part of the failure detection mechanism
+(FailureDetector.cc) where each master occasionally pings a randomly-chosen
+server in the cluster. This mechanism is intended primarily to detect
+failures of the pingees, but it also allows the pinger to find out if it is
+a zombie. As part of each ping request, the caller includes its server id,
+and the pingee returns a STATUS_CALLER_NOT_IN_CLUSTER exception if the
+caller does not appear in its server list. When the caller receives this
+error it verifies its cluster membership with the coordinator as
+described above, and commits suicide if it is not part of the cluster.
+
+Potential weakness: if FailureDetector is not able to contact any other
+servers it might not detect the fact that it is a zombie. To handle this,
+if several ping attempts in a row fail, a server automatically questions
+its own liveness and verifies its cluster membership with the coordinator.
+
+Potential weakness: a server might not be able to contact the coordinator
+to verify its membership, and hence might continue servicing requests.
+To eliminate this problem, a server refuses to serve client requests such
+as reads and writes while it is verifying its cluster membership. It rejects
+these requests with STATUS_RETRY; if it turns out that the server really
+isn't a zombie, it will eventually serve the requests when they get retried.
+
+Potential weakness: if the coordinator is unable to contact all of the servers
+in the cluster to notify them of the crashed server's failure, then if the
+crashed server "gets lucky" and happens to ping the servers that weren't
+reached by the coordinator, it might continue servicing read requests. This
+problem is unlikely to occur in practice, because the zombie server will ping
+at least 10 other servers before replacement servers accept any write requests;
+at least one of them is likely to know about the server's death. However, this
+is just a probabilistic argument: there is no guarantee.
+
+Timing-Dependent Tests
+----------------------
+Several unit tests have timing dependencies. For example, they execute an
+action with the expectation that this will cause some other result a short
+time later (e.g., if a network packet is sent, it should arrive at its
+destination soon). In the normal case, the results should appear quickly,
+so it's tempting to simply wait a short amount of time (e.g., usleep(1000))
+and then check for the result. This will usually work fine, but sometimes
+tests can be artificially delayed (for example, if the test machine becomes
+heavily loaded). Thus, to be safe, the sleep time would have to be made much
+longer, say one second. However, this would make the tests run slowly.
+
+As a result, many tests use a construct like this:
+
+for (int i = 0; i < 1000; i++) {
+    if (/* desired result has occurred */) {
+        break;
+    }
+    usleep(1000);
+}
+EXPECT_EQ(... check for desired result ...);
+
+In the normal case the test will complete quickly. If there are timing
+glitches, the test will wait longer, but it will eventually complete.
+If there is a real problem (e.g. a bug prevents the desired result from
+ever occurring) the loop will eventually terminate and the following
+assertions will fail.
+
+----------------
+Linearizable RPC
+----------------
+A RPC in Ramcloud is not linearizable with respect to re-execution in certain
+circumstances (eg. server crash) because the same RPC could be executed
+multiple times. For example, the problem exists for conditional write; a client
+sends a conditional write RPC request, and the responsible master crashes in
+between processing the conditional write and replying with the result of the
+conditional write. Then the client will retry the conditional write since it
+thinks the original request was lost. A recovery master will have the updated
+value (since the original master had committed the result on the log) and will
+respond to the re-tried conditional write with a failure due to a version
+number mismatch. The correct behavior should be that the recovery master
+understands that the request is being retried and responds with the original
+result "success".
+
+We resolve this problem by saving the results of RPCs on masters. If a master
+is asked to execute the same RPC again, it just returns the old result instead
+of re-executing. To implement this solution, modifications on client, master,
+and logging system were required.
+
+1. Client
+Each client provides a unique ID for each RPC, so that masters can detect
+duplicate RPCs. Also, a client has to tell masters about results it has
+received, so that master can discard saved results that are no longer needed.
+
+1.1 Client ID assignments
+The identification of an RPC has two components: an rpc sequence
+number (shortened to rpc ID) and a client ID. Since the rpc ID is only
+unique within a client, a master needs an ID for the client
+to distinguish duplicate RPCs. When a client starts, it enlists itself with the
+Coordinator and obtains a unique client ID, which is attached to every
+linearizable RPC later.
+
+1.2 Rpc ID & ack ID assignment by RpcTracker
+A client-side data structure, called RpcTracker, keeps the last assigned rpc ID
+and the status of all outstanding RPCs whose results have not yet been received.
+We use RpcTracker to assign new rpc IDs and calculate ack IDs (which indicate
+that responds have been received for all RPCs with rpc ID below the number).
+
+1.3 Maintaining lease on coordinator
+Before sending a linearizable RPC to a master, a client must make sure that the
+lease for its client ID is initiated and active. Enlisting with
+coordinator initiates the lease on coordinator side, and the client should
+maintain the lease by sending renew requests to coordinator before
+expiration as long as it want masters to keep its linearizable states. This
+lease-like mechanism is used to ensure safe garbage collection for client
+states (See section 2.3 for how masters use this lease.)
+
+2. Master
+With the client ID, rpc ID, and ack ID from a client, a master avoids
+re-execution of duplicate RPC by saving the results of RPCs in its internal
+memory (for fast lookup) and in its log (for durability). I will talk about
+the details of logging in section 3, and now focus on the internal memory
+data structure.
+
+2.1 Memory data structure: UnackedRpcResults
+After a master completes an RPC, it records its result in the log. To locate
+the result in the log efficiently, each master keeps a data structure called
+UnackedRpcResults.
+A master records the start and the completion of an RPC execution in
+UnackedRpcResults, so that it can check whether an incoming RPC is a
+duplicate later.
+
+2.2 Garbage collection by ack ID
+The memory data structure, UnackedRpcResults, may grow very quickly as
+we need a separate entry for every linearizable RPCs. We need a way to
+clean up information that is no longer needed. We use the ack IDs attached to
+linearizable RPCs to clean up the stale records safely.
+The difference of rpcId - ackId is bounded by a fixed constant, and a client
+waits for ackId to increase before sending more linearizable RPCs, guaranteeing
+bounded memory use for the client on a master.
+
+2.3 Cleanup for silent client.
+By our scheme of garbage collection by ackId, disconnected (or dead) clients
+always leave the last entry unacknowledged. We garbage collect this by
+implementing a lease-like mechanism. As in section 1.3, a client maintains the
+lease with its client ID on coordinator for the duration of linearizability
+needs. A master keeps track of how much time has elapsed since each client's
+last linearizable RPC request. Periodically, master checks with coordinator for
+liveness of the leases for the clients inactive for a long time. If the
+coordinator's main lease is expired, the master can garbage collects the
+client state safely.
+
+3. Logging
+For durability, we store the result of each linearizable RPC in log (both
+in a master's log-structured memory and backups). For that, we defined
+a new type of log entry and we can recover all necessary information
+from the log entries after a crash.
+
+3.1 Structure of the new type of log entry: rpc log entry
+For each completed linearizable RPC, the new type of log entry is written.
+The log entry has "<Result>" (for replying to duplicate rpcs in future),
+"<TableId, KeyHash>" (for finding the correct recovery master during recovery,
+more details in section 3.2), and "<clientId, rpcId, ackId>" (for
+reconstructing UnackedRpcResults during recovery). I will call this new type
+of log entry an rpc log entry. On each update of an object with linearizable
+RPC, we should write both the new object log entry and the new rpc log entry
+atomically. As we write them atomically, we can guarantee the consistent
+behavior on crash: either an RPC is never executed, or it is executed and
+duplicate RPCs will be detected.
+
+3.2 Distribution of rpc log entries after crash.
+During crash recovery, log entries get split to many recovery masters.
+After crash recovery, a re-tried linearizable RPC will be directed to the new
+recovery master (which received the corresponding log entries), so relevant
+rpc log entries should also migrate to the master.
+We associate an object with each linearizable RPC and refer to the
+<TableId, KeyHash> value in a log entry to decide which recovery master should
+receive the rpc log entry.
+
+3.3 Reconstruction of UnackedRpcResults table during crash recovery.
+On crash recovery, we can reconstruct UnackedRpcResults with the following
+steps. After a recovery master gathers relevant portion of rpc log entries,
+it just replays the rpc log entry by using <clientId, rpcId, ackId> to
+re-construct (or add new info to) UnackedRpcResults on the recovery master.
+
+3.4 Log cleaning for new log entry type.
+The existing log cleaner should be modified to handle cleaning of rpc log
+entries. When it finds an rpc log entry with <clientId, rpcId, ackId>, the log
+cleaner checks the UnackedRpcResults to figure out whether the rpc is already
+acknowledged. If it is, we can clean it up. If not, the log entry is still
+valid and needs to be copied to a new location in the log. After relocating
+the log entry, we should update UnackedRpcResults to have correct pointer
+to the log entry.
+
+Header Minimization
+-------------------
+In several places in the RAMCloud sources, nested structures are referenced
+with a pointer rather than an inline structure, e.g.
+    ClientLease *clientLease
+not
+    ClientLease clientLease
+This complicates storage management slightly (e.g., destructors must free
+the nested object), but it eliminates the need for the corresponding header
+file to be included. This is important primarily in header files that are
+used by clients, such as RamCloud.h:  without this approach, virtually every
+RAMCloud header file would be needed to compile a client application.

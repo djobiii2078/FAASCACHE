@@ -1,0 +1,5 @@
+[0m[[0m[31merror[0m] [0m[0m/home/djobiii2078/Dropbox/PHD-Papers/faas-slime-cache/paper/paper-cloud-storage-cache/dev/docs-RamCloud/RAMCloud/bindings/scalaTests/testclientscala/src/main/scala/Main.scala:13:16: cannot override final member:[0m
+[0m[[0m[31merror[0m] [0m[0mfinal def main(args: Array[String]): Unit (defined in trait App)[0m
+[0m[[0m[31merror[0m] [0m[0m  override def main(args: Array[String]) {[0m
+[0m[[0m[31merror[0m] [0m[0m               ^[0m
+[0m[[0m[31merror[0m] [0m[0mone error found[0m

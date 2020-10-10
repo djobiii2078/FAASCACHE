@@ -1,0 +1,3 @@
+g++ -g  -fno-strict-aliasing -MD -msse4.2 -DTESTING=1 -fno-builtin -march=core2 -DVALGRIND -std=c++11 -Isrc -Iobj.master -Igtest/include -Ilogcabin -v -Lobj.master obj.master/OptionParser.o -lpcrecpp -lboost_program_options -lprotobuf -lrt -lpthread -lssl -lcrypto -rdynamic -Werror -Wall -Wformat=2 -Wextra -Wwrite-strings -Wno-unused-parameter -Wmissing-format-attribute -Wno-non-template-friend -Woverloaded-virtual -Wcast-qual -Wcast-align -Wconversion -Weffc++  ClientRamCloud.cc obj.master/libramcloud.so -libverbs -o ClientRamcloud
+
+g++ -v -Lobj.master -Isrc -Iobj.master ClientRamCloud.cc obj.master/libramcloud.so -oClientRamCloud

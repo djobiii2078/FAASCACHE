@@ -1,0 +1,91 @@
+packages:
+    dataset_gen:
+      actions:
+        wand_blur:
+          function: wand_blur/__main__.py
+          docker: nivekiba/python3action:magick
+          limits:
+            memorySize: 3072
+          annotations:
+            parameters:
+              - name: url
+                type: string
+                description: input URL of swift
+              - name: image
+                type: string
+                description: name of the image object in swift (in the container expe-faas)
+              - name: sigma
+                type: range_float
+                description: sigma blurring coefficient
+                min: 0.3
+                max: 100
+        wand_denoise:
+          function: wand_denoise/__main__.py
+          docker: nivekiba/python3action:magick
+          limits:
+            memorySize: 3072
+          annotations:
+            parameters:
+              - name: url
+                type: string
+                description: input URL
+              - name: threshold
+                type: range_float
+                description: noise threshold
+                min: 0
+                max: 1
+              - name: softness
+                type: range_float
+                description: denoising softness
+                min: 0
+                max: 1
+        wand_edge:
+          function: wand_edge/__main__.py
+          docker: nivekiba/python3action:magick
+          limits:
+            memorySize: 3072
+          annotations:
+            parameters:
+              - name: url
+                type: string
+                description: input URL
+        wand_resize:
+          function: wand_resize/__main__.py
+          docker: nivekiba/python3action:magick
+          limits:
+            memorySize: 3072
+          annotations:
+            parameters:
+              - name: url
+                type: string
+                description: input URL
+              - name: width
+                type: range_int
+                description: target width
+                min: 100
+                max: 1920
+        wand_rotate:
+          function: wand_rotate/__main__.py
+          docker: nivekiba/python3action:magick
+          limits:
+            memorySize: 3072
+          annotations:
+            parameters:
+              - name: url
+                type: string
+                description: input URL
+              - name: angle
+                type: ensemble
+                description: rotation angle (counter-clockwise)
+                values: [90, 180, 270]
+        wand_sepia:
+          function: wand_sepia/__main__.py
+          docker: nivekiba/python3action:magick
+          limits:
+            memorySize: 3072
+          annotations:
+            parameters:
+              - name: url
+                type: string
+                description: input URL
+  

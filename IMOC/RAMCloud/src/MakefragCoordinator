@@ -1,0 +1,29 @@
+COORDINATOR_SRCFILES := \
+			src/ClientLeaseAuthority.cc \
+			src/CoordinatorClusterClock.cc \
+			src/CoordinatorServerList.cc \
+			src/CoordinatorService.cc \
+			src/CoordinatorUpdateManager.cc \
+			src/MasterRecoveryManager.cc \
+			src/MockExternalStorage.cc \
+			src/Tablet.cc \
+			src/TableManager.cc \
+			src/Recovery.cc \
+			src/RuntimeOptions.cc \
+			src/CoordinatorClusterClock.pb.cc \
+			src/CoordinatorUpdateInfo.pb.cc \
+			src/ServerListEntry.pb.cc \
+			src/Table.pb.cc \
+			src/TableManager.pb.cc \
+			$(NULL)
+
+COORDINATOR_OBJFILES := $(COORDINATOR_SRCFILES)
+COORDINATOR_OBJFILES := $(patsubst src/%.cc, $(OBJDIR)/%.o, $(COORDINATOR_OBJFILES))
+COORDINATOR_OBJFILES := $(COORDINATOR_OBJFILES) $(SHARED_OBJFILES)
+
+$(OBJDIR)/coordinator: $(COORDINATOR_OBJFILES) \
+                       $(OBJDIR)/CoordinatorMain.o
+	@mkdir -p $(@D)
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+all: $(OBJDIR)/coordinator

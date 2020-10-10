@@ -1,0 +1,24 @@
+packages:
+    videos:
+      actions:
+        mst:
+          function: mst/__main__.js
+          docker: nivekiba/python3action:moviepy
+          limits:
+            memorySize: 3072
+        msut:
+          function: msut/__main__.js
+          docker: nivekiba/python3action:moviepy
+          limits:
+            memorySize: 3072
+        rct:
+          function: rct/__main__.js
+          docker: nivekiba/python3action:moviepy
+          limits:
+            memorySize: 3072
+        ssca5t:
+          function: ssca5t/__main__.js
+          docker: nivekiba/python3action:moviepy
+          limits:
+            memorySize: 3072
+                

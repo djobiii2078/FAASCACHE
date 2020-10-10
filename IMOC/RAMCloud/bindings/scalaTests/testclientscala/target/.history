@@ -1,0 +1,12 @@
+~run
+show unmanaged base
+show unmanagedBasse
+show unmanagedBase
+~run
+show unmanagedJar
+show unmanagedJars
+~compile
+~run
+~compile
+~clean
+~run

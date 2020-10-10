@@ -1,0 +1,5 @@
+Wand == 0.5.7
+boto3
+redis == 3.5.3
+psutil
+python-swiftclient

@@ -1,0 +1,10 @@
+version: "2.3"
+services:
+  gpu:
+    image: scannerresearch/scanner:gpu
+    ports:
+      - "8888:8888"
+  cpu:
+    image: scannerresearch/scannertools:cpu-latest
+    ports:
+      - "8888:8888"

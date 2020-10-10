@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# these scripts are intended to be run from the top level
+# of the project
+
+outfile=/dev/null
+count=10
+
+while getopts "n:v" OPT; do
+    case $OPT in
+        n)
+            count=$OPTARG
+            ;;
+        v)
+            outfile=/dev/stdout
+            ;;
+    esac
+done
+
+source scripts/common.bash
+
+port=11112
+cport=$(( $port + 1 ))
+
+masterLocator=basic+udp:host=127.0.0.1,port=$port
+coordinatorLocator=basic+udp:host=127.0.0.1,port=$cport
+
+# Check to see if master and coordinator servers are running. If so, kill 'em!
+portslay $port
+portslay $cport
+
+atexit "portslay $port"
+atexit "portslay $cport"
+
+# Start a server and run tests
+$OBJDIR/coordinator -C $coordinatorLocator > /dev/null 2>&1 &
+$OBJDIR/server -M -L $masterLocator -C $coordinatorLocator & 
+sleep .1
+
+python scripts/smack.py -n $count -C $coordinatorLocator > $outfile
+retval=$?
+
+exit $retval

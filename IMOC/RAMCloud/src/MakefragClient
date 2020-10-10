@@ -1,0 +1,150 @@
+ifeq ($(INFINIBAND),yes)
+INFINIBAND_SRCFILES := \
+	   src/Infiniband.cc \
+	   src/InfRcTransport.cc \
+	   src/InfUdDriver.cc \
+	   $(NULL)
+else
+INFINIBAND_SRCFILES :=
+endif
+
+ifeq ($(ONLOAD),yes)
+SOLARFLARE_SRC := \
+	src/SolarFlareDriver.cc \
+	$(NULL)
+else
+SOLARFLARE_SRC :=
+endif
+
+ifeq ($(DPDK),yes)
+DPDK_SRC := \
+        src/DpdkDriver.cc \
+        $(NULL)
+else
+DPDK_SRC :=
+endif
+
+CLIENT_SRCFILES := \
+		   src/AbstractServerList.cc \
+		   src/AdminClient.cc \
+		   src/ArpCache.cc \
+		   src/BasicTransport.cc \
+		   src/Buffer.cc \
+		   src/CRamCloud.cc \
+		   src/CacheTrace.cc \
+		   src/ClientException.cc \
+		   src/ClientLeaseAgent.cc \
+		   src/ClientTransactionManager.cc \
+		   src/ClientTransactionTask.cc \
+		   src/ClusterMetrics.cc \
+		   src/CodeLocation.cc \
+		   src/Context.cc \
+		   src/CoordinatorClient.cc \
+		   src/CoordinatorRpcWrapper.cc \
+		   src/CoordinatorSession.cc \
+		   src/Crc32C.cc \
+		   src/Common.cc \
+		   src/Cycles.cc \
+		   src/Dispatch.cc \
+		   src/DispatchExec.cc \
+		   src/Driver.cc \
+		   src/ExternalStorage.cc \
+		   src/FailSession.cc \
+		   src/FileLogger.cc \
+		   src/HomaTransport.cc \
+		   src/IndexKey.cc \
+		   src/IndexLookup.cc \
+		   src/IndexRpcWrapper.cc \
+		   src/IpAddress.cc \
+		   src/Key.cc \
+		   src/LinearizableObjectRpcWrapper.cc \
+		   src/LogEntryTypes.cc \
+		   src/Logger.cc \
+		   src/LargeBlockOfMemory.cc \
+		   src/LogCabinLogger.cc \
+		   src/LogCabinStorage.cc \
+		   src/LogMetricsStringer.cc \
+		   src/LogProtector.cc \
+		   src/MacAddress.cc \
+		   src/MacIpAddress.cc \
+		   src/MasterClient.cc \
+		   src/Memory.cc \
+		   src/MultiOp.cc \
+		   src/MultiIncrement.cc \
+		   src/MultiRead.cc \
+		   src/MultiRemove.cc \
+		   src/MultiWrite.cc \
+		   src/MurmurHash3.cc \
+		   src/NetUtil.cc \
+		   src/Object.cc \
+		   src/ObjectBuffer.cc \
+		   src/ObjectFinder.cc \
+		   src/ObjectRpcWrapper.cc \
+		   src/PcapFile.cc \
+		   src/PerfCounter.cc \
+		   src/PerfStats.cc \
+		   src/PortAlarm.cc \
+		   src/RamCloud.cc \
+		   src/RawMetrics.cc \
+		   src/RpcLevel.cc \
+		   src/RpcTracker.cc \
+		   src/RpcWrapper.cc \
+		   src/SegletAllocator.cc \
+		   src/Seglet.cc \
+		   src/Segment.cc \
+		   src/ServerIdRpcWrapper.cc \
+		   src/ServerList.cc \
+		   src/ServerMetrics.cc \
+		   src/Service.cc \
+		   src/ServiceLocator.cc \
+		   src/SessionAlarm.cc \
+		   src/SpinLock.cc \
+		   src/Status.cc \
+		   src/StringUtil.cc \
+		   src/TableEnumerator.cc \
+		   src/TcpTransport.cc \
+		   src/TestLog.cc \
+		   src/ThreadId.cc \
+		   src/TimeCounter.cc \
+		   src/TimeTrace.cc \
+		   src/TimeTraceUtil.cc \
+		   src/Transaction.cc \
+		   src/Transport.cc \
+		   src/TransportManager.cc \
+		   src/UdpDriver.cc \
+		   src/Util.cc \
+		   src/WireFormat.cc \
+		   src/WorkerManager.cc \
+		   src/WorkerSession.cc \
+		   src/WorkerTimer.cc \
+		   src/ZooStorage.cc \
+		   $(INFINIBAND_SRCFILES) \
+		   $(SOLARFLARE_SRC) \
+		   $(DPDK_SRC) \
+		   $(OBJDIR)/Histogram.pb.cc \
+		   $(OBJDIR)/LogMetrics.pb.cc \
+		   $(OBJDIR)/MasterRecoveryInfo.pb.cc \
+		   $(OBJDIR)/MetricList.pb.cc \
+		   $(OBJDIR)/ServerConfig.pb.cc \
+		   $(OBJDIR)/ServerList.pb.cc \
+		   $(OBJDIR)/ServerStatistics.pb.cc \
+		   $(OBJDIR)/SpinLockStatistics.pb.cc \
+		   $(OBJDIR)/Tablets.pb.cc \
+		   $(OBJDIR)/Indexlet.pb.cc \
+		   $(OBJDIR)/RecoveryPartition.pb.cc \
+		   $(OBJDIR)/TableConfig.pb.cc \
+		   $(NULL)
+
+CLIENT_OBJFILES := $(CLIENT_SRCFILES)
+CLIENT_OBJFILES := $(patsubst src/%.cc, $(OBJDIR)/%.o, $(CLIENT_OBJFILES))
+CLIENT_OBJFILES := $(patsubst $(OBJDIR)/%.cc, $(OBJDIR)/%.o, $(CLIENT_OBJFILES))
+
+$(OBJDIR)/libramcloud.a: $(CLIENT_OBJFILES)
+	@mkdir -p $(@D)
+	$(AR) rcs $@ $^
+
+$(OBJDIR)/libramcloud.so: $(CLIENT_OBJFILES)
+	@mkdir -p $(@D)
+	$(CXX) $(LDFLAGS) -shared -o $@ $^ -Wl,--no-undefined,-soname,libramcloud.so $(LIBS)
+
+all: $(OBJDIR)/libramcloud.so $(OBJDIR)/libramcloud.a

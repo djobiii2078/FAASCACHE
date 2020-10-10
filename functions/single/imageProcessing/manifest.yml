@@ -1,0 +1,141 @@
+packages:
+  dataset_gen:
+    actions:
+      sharp_blur:
+        function: sharp_blur.zip
+        runtime: nodejs:10
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL
+            - name: sigma
+              type: range_float
+              description: sigma blurring coefficient
+              min: 0.3
+              max: 100
+      sharp_sepia:
+        function: sharp_sepia.zip
+        runtime: nodejs:10
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL
+      sharp_resize:
+        function: sharp_resize.zip
+        runtime: nodejs:10
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL
+            - name: width
+              type: range_int
+              description: target width
+              min: 100
+              max: 1920
+      sharp_convert:
+        function: sharp_convert.zip
+        runtime: nodejs:10
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL
+            - name: format
+              type: ensemble
+              description: target format
+              values: [webp, tiff, png]
+      wand_blur:
+        function: wand_blur.zip
+        docker: python3action:magick
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL
+            - name: sigma
+              type: range_float
+              description: sigma blurring coefficient
+              min: 0.3
+              max: 100
+      wand_denoise:
+        function: wand_denoise.zip
+        docker: python3action:magick
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL
+            - name: threshold
+              type: range_float
+              description: noise threshold
+              min: 0
+              max: 1
+            - name: softness
+              type: range_float
+              description: denoising softness
+              min: 0
+              max: 1
+      wand_edge:
+        function: wand_edge.zip
+        docker: python3action:magick
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL
+      wand_resize:
+        function: wand_resize.zip
+        docker: python3action:magick
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL
+            - name: width
+              type: range_int
+              description: target width
+              min: 100
+              max: 1920
+      wand_rotate:
+        function: wand_rotate.zip
+        docker: python3action:magick
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL
+            - name: angle
+              type: ensemble
+              description: rotation angle (counter-clockwise)
+              values: [90, 180, 270]
+      wand_sepia:
+        function: wand_sepia.zip
+        docker: python3action:magick
+        limits:
+          memorySize: 3072
+        annotations:
+          parameters:
+            - name: url
+              type: string
+              description: input URL

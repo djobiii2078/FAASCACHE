@@ -1,0 +1,68 @@
+/* Copyright (c) 2010-2013 Stanford University
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR(S) DISCLAIM ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL AUTHORS BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+syntax = "proto2";
+
+package RAMCloud.ProtoBuf;
+
+/// A list of servers, which describes the services they provide and a
+/// means of contacting them using RAMCloud transports.
+///
+/// This message is used both when pulling complete lists from the
+/// coordinator (GetServerListRpc) and when pushing delta updates
+/// to other servers by the coordinator (UpdateServerListRpc).
+message ServerList {
+  message Entry {
+    /// Which services this server is running.
+    required fixed32 services = 1;
+
+    /// A unique id for the service.
+    required fixed64 server_id = 2;
+
+    /// A locator for the service.
+    required string service_locator = 3;
+
+    /// Disk bandwidth of the backup server in MB/s, if this entry represents
+    /// a server which is running a backup service.
+    required fixed32 expected_read_mbytes_per_sec = 5;
+
+    /// The current status of this server in terms of cluster membership.
+    /// See above for ServerStatus in ServerList.h for legal enum values.
+    required fixed32 status = 6;
+
+    /// The replicationId of the server.
+    required fixed64 replication_id = 7;
+  }
+
+  /// List of servers. If type is UPDATE then this list should only have
+  /// a single entry.
+  repeated Entry server = 1;
+
+  /// Generation number of the Coordinator's list that corresponds to
+  /// the information in this message. Used to ignore duplicate or
+  /// oout-of-order information. See CoordinatorServerList::version and
+  /// ServerList::version for more details.
+  required fixed64 version_number = 2;
+
+  enum Type {
+     /// Specifies that this is a full server list
+     FULL_LIST = 0;
+
+     /// Specifies that this is a delta update
+     UPDATE    = 1;
+  }
+
+  required Type type = 3;
+}

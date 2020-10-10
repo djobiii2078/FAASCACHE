@@ -1,0 +1,242 @@
+
+/**
+ * RAMCloud Java bindings build script v2
+ * [Adding stacktrace options]
+ */
+
+
+apply plugin: 'application'
+apply plugin: 'cpp'
+
+def ramcloudDir = "../.."
+def ramcloudSrc = "src"
+def ramcloudBin = findRamcloudBin()
+def jniDirs = findJniDirs()
+def bindingsDir = "${buildDir}/generated"
+def distDir = "dist"
+
+model {
+    repositories {
+        libs(PrebuiltLibraries) {
+            jni {
+                headers.srcDirs(*jniDirs)
+            }
+            gtest {
+                headers.srcDir("$ramcloudDir/gtest/include")
+            }
+            ramcloud {
+                headers.srcDirs("$ramcloudDir/$ramcloudSrc",
+                                "$ramcloudDir/$ramcloudBin")
+                binaries.withType(SharedLibraryBinary) {
+                    sharedLibraryFile = file(
+                            "$ramcloudDir/$ramcloudBin/libramcloud.so")
+                }
+            }
+            ramcloudtest {
+                headers.srcDirs("$ramcloudDir/$ramcloudSrc",
+                                "$ramcloudDir/$ramcloudBin")
+                binaries.withType(SharedLibraryBinary) {
+                    sharedLibraryFile = file(
+                            "$ramcloudDir/$ramcloudBin/libramcloudtest.so")
+                }
+            }
+            bindings {
+                headers.srcDir(bindingsDir)
+            }
+        }
+    }
+    components {
+        main(NativeLibrarySpec) {
+            baseName "ramcloud_java"
+            binaries.all {
+                builtBy(javah)
+                cppCompiler.args "--std=c++11", "-g"
+            }
+            binaries.withType(StaticLibraryBinarySpec) {
+                buildable = false
+            }
+            sources {
+                cpp.lib library: 'jni', linkage: 'api'
+                cpp.lib library: 'ramcloud', linkage: 'shared'
+                cpp.lib library: 'bindings', linkage: 'api'
+            }
+        }
+        test(NativeLibrarySpec) {
+            baseName "ramcloud_java_test"
+            binaries.all {
+                builtBy(javahTest)
+                cppCompiler.args "--std=c++11"
+            }
+            binaries.withType(StaticLibraryBinarySpec) {
+                buildable = false
+            }
+            sources {
+                cpp.lib library: 'jni', linkage: 'api'
+                cpp.lib library: 'gtest', linkage: 'api'
+                cpp.lib library: 'ramcloud', linkage: 'shared'
+                cpp.lib library: 'ramcloudtest', linkage: 'shared'
+                cpp.lib library: 'bindings', linkage: 'api'
+            }
+        }
+    }
+}
+
+// Copy shared libraries to libs
+tasks.whenTaskAdded { task ->
+    if (task.name == "mainSharedLibrary") {
+        project.task([type: Copy], 'copyLibs') {
+            from binaries.mainSharedLibrary.sharedLibraryFile
+            into sourceSets.main.output.resourcesDir.path + "/libs"
+        }
+        jar.dependsOn(copyLibs)
+        copyLibs.dependsOn(mainSharedLibrary)
+    }
+    if (task.name == "testSharedLibrary") {
+        project.task([type: Copy], 'copyLibsTest') {
+            from binaries.testSharedLibrary.sharedLibraryFile
+            into sourceSets.test.output.resourcesDir.path + "/libs"
+        }
+        copyLibsTest.dependsOn(testSharedLibrary)
+        compileTestJava.dependsOn(copyLibs)
+        test.dependsOn(copyLibsTest)
+    }
+}
+
+distributions {
+    main{
+        baseName = 'ramcloud'
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// TestNG dependency. Gradle will automatically download it.
+dependencies {
+    testCompile 'org.testng:testng:6.9.4'
+}
+
+test {
+    // enable TestNG support (default is JUnit)
+    useTestNG() {
+        // threadCount = 1
+    }
+
+    // show standard out and standard error of the test JVM(s) on the console
+    testLogging.showStandardStreams = true
+
+    // set heap size for the test JVM(s)
+    minHeapSize = "1024m"
+    maxHeapSize = "1024m"
+}
+
+run {
+    if (project.hasProperty("locator")) {
+        args locator
+    }
+}
+
+mainClassName = "edu.stanford.ramcloud.TestClient"
+defaultTasks 'make'
+
+run.dependsOn('make')
+
+// Alias make to task jar
+task make(dependsOn: installDist) {
+    description 'Alias for installDist'
+}
+
+task javah(type: Javah, dependsOn: classes) {
+    sourceSet = 'main'
+    outputDir = file("$bindingsDir")
+}
+
+task javahTest(type: Javah, dependsOn: testClasses){
+    sourceSet = 'test'
+    outputDir = file("$bindingsDir")
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.6'
+}
+
+def findRamcloudBin() {
+    def proc = "git rev-parse --abbrev-ref HEAD".execute()
+    proc.waitFor()
+    def currentBranch = proc.in.text.trim()
+    if (currentBranch.equals("HEAD")) {
+      return "obj"
+    }
+    return "obj.$currentBranch"
+}
+
+def findJniDirs() {
+    def proc = "which javac".execute()
+    proc.waitFor()
+    def javacPath = proc.in.text
+    if (javacPath.isEmpty()) {
+        throw new GradleException("javac must be on your path.\n")
+    }
+    proc = "readlink -f $javacPath".execute()
+    proc.waitFor()
+    def javac = file(proc.in.text)
+    def include = file(javac.parentFile.parent + "/include")
+    def includes = [include.path]
+    include.eachDir(includes.&add)
+    return includes
+}
+
+class Javah extends DefaultTask {
+    @Input
+    def sourceSet
+
+    // Initialize inputDir variable
+    def setSourceSet(sourceSet) {
+        this.sourceSet = sourceSet
+        this.inputDir = project.sourceSets."$sourceSet".output.classesDir
+    }
+
+    @InputDirectory
+    File inputDir
+
+    @OutputDirectory
+    def File outputDir
+
+    @TaskAction
+    void execute(IncrementalTaskInputs inputs) {
+        logging.level = LogLevel.INFO
+        inputs.outOfDate { change ->
+            def relativePath = getRelativePath(file)
+
+            // Ignore nested classes
+            if (relativePath.contains("\$")) {
+                return
+            }
+
+            def sourceSetObj = project.sourceSets."$sourceSet"
+            def classpath = sourceSetObj.runtimeClasspath.files.join(":")
+            ant.javah(class: relativePath.replaceAll("/", "."),
+                      destDir: outputDir.path,
+                      classpath: classpath)
+        }
+
+        inputs.removed { change ->
+            def relativePath = getRelativePath(file)
+
+            // Ignore nested classes
+            if (relativePath.contains("\$")) {
+                return
+            }
+
+            outputDir.eachFileMatch(
+                    ~/.*${relativePath.replaceAll('/', '_')}.*/) {
+                it.deleteOnExit()
+            }
+        }
+    }
+
+    def getRelativePath(file) {
+        return file.path.minus("${inputDir.path}/").minus(".class")
+    }
+}

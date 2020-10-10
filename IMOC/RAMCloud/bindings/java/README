@@ -1,0 +1,11 @@
+Make sure you have built the C++ RAMCloud project (make all)
+Make sure that the "javac" executable is on your path
+Use "./gradlew" or "./gradlew make" to build the Java bindings
+Use "./gradlew run -Plocator=<locatorString>" or "build/install/ramcloud/bin/ramcloud" to run TestClient
+
+Unit tests are currently non-functional.
+
+Java and C++ sources for the bindings are located in src/main/
+Java and C++ sources for the unit tests are located in src/test/
+
+Javadoc is available at: https://ramcloud.stanford.edu/docs/javadoc/

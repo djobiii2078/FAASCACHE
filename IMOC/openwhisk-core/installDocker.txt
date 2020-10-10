@@ -1,0 +1,36 @@
++++++++++++++++++++++++++++++++++
++				+
++ Install Docker by djobiii2078 +
++				+
++++++++++++++++++++++++++++++++++
+
+We assume you possess an Ubuntu distribution. 
+
+1- First step, clean all existing docker packages.
+
+	 sudo apt-get purge docker lxc-docker docker-engine docker.io
+
+2- Second step, install curl and tools for ssl certificates. 
+
+	sudo apt-get install curl apt-transport-https ca-certificates software-properties-common
+
+3- Add docker repository to your distribution.
+	
+	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add 
+	sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+4- Now update your repositories and install docker. 
+
+	sudo apt get update
+	sudo apt get install docker-ce
+	systemctl status docker  
+
+5- Next, let's add docker to our user group 
+
+	sudo usermod -aG docker ${USER}
+	
+5- Now let's install npm (nodjs)
+
+	curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
+	sudo apt update | sudo apt install nodejs 
+

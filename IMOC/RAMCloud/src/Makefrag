@@ -1,0 +1,222 @@
+OBJDIRS += $(OBJDIR)
+
+AUTO_GEN_HEADERS := $(patsubst src/%.proto, $(OBJDIR)/%.pb.h, $(wildcard src/*.proto))
+AUTO_GEN_HEADERS += $(OBJDIR)/RawMetrics.in.h
+.SECONDARY: $(AUTO_GEN_HEADERS)
+$(OBJDIR)/%.pb.cc $(OBJDIR)/%.pb.h: $(TOP)/src/%.proto
+	@mkdir -p $(OBJDIR)
+	@echo $(PROTOC) ... $$(basename $<)
+	@cd $(TOP)/src/; \
+	$(PROTOC) --cpp_out=$(TOP)/$(OBJDIR) $$(basename $<) || exit 1; \
+	echo "// RAMCloud pragma [GCCWARN=0]" >> $(TOP)/$(OBJDIR)/$$(basename $< .proto).pb.h; \
+	echo "// RAMCloud pragma [GCCWARN=0]" >> $(TOP)/$(OBJDIR)/$$(basename $< .proto).pb.cc
+
+
+ifeq ($(INFINIBAND),yes)
+INFINIBAND_SRCFILES := \
+	   src/Infiniband.cc \
+	   src/InfRcTransport.cc \
+	   src/InfUdDriver.cc \
+	   $(NULL)
+else
+INFINIBAND_SRCFILES :=
+endif
+
+ifeq ($(ONLOAD),yes)
+SOLARFLARE_SRC := \
+	src/SolarFlareDriver.cc \
+	$(NULL)
+else
+SOLARFLARE_SRC :=
+endif
+
+ifeq ($(DPDK),yes)
+DPDK_SRC := \
+        src/DpdkDriver.cc \
+        $(NULL)
+else
+DPDK_SRC :=
+endif
+
+# these files are compiled into everything but clients
+SHARED_SRCFILES := \
+		   src/AbstractLog.cc \
+		   src/AbstractServerList.cc \
+		   src/AdminClient.cc \
+		   src/AdminService.cc \
+		   src/ArpCache.cc \
+		   src/BasicTransport.cc \
+		   src/CacheTrace.cc \
+		   src/ClientException.cc \
+		   src/ClientLeaseAgent.cc \
+		   src/ClientTransactionManager.cc \
+		   src/ClientTransactionTask.cc \
+		   src/Context.cc \
+		   src/CoordinatorClient.cc \
+		   src/CoordinatorRpcWrapper.cc \
+		   src/CoordinatorSession.cc \
+		   src/CoordinatorUpdateManager.cc \
+		   src/Crc32C.cc \
+		   src/BackupClient.cc \
+		   src/BackupFailureMonitor.cc \
+		   src/BackupSelector.cc \
+		   src/Buffer.cc \
+		   src/CleanableSegmentManager.cc \
+		   src/ClientException.cc \
+		   src/ClusterMetrics.cc \
+		   src/CodeLocation.cc \
+		   src/Common.cc \
+		   src/Cycles.cc \
+		   src/DataBlock.cc \
+		   src/Dispatch.cc \
+		   src/DispatchExec.cc \
+		   src/Driver.cc \
+		   src/ZooStorage.cc \
+		   src/Enumeration.cc \
+		   src/EnumerationIterator.cc \
+		   src/ExternalStorage.cc \
+		   src/FailureDetector.cc \
+		   src/FailSession.cc \
+		   src/FileLogger.cc \
+		   src/HashTable.cc \
+		   src/HomaTransport.cc \
+		   src/IndexKey.cc \
+		   src/IndexletManager.cc \
+		   src/IndexLookup.cc \
+		   src/IndexRpcWrapper.cc \
+		   src/IpAddress.cc \
+		   src/Key.cc \
+		   src/LargeBlockOfMemory.cc \
+		   src/LinearizableObjectRpcWrapper.cc \
+		   src/LockTable.cc \
+		   src/Log.cc \
+		   src/LogCabinLogger.cc \
+		   src/LogCabinStorage.cc \
+		   src/LogCleaner.cc \
+		   src/LogDigest.cc \
+		   src/LogEntryRelocator.cc \
+		   src/LogEntryTypes.cc \
+		   src/LogMetricsStringer.cc \
+		   src/LogProtector.cc \
+		   src/Logger.cc \
+		   src/LogIterator.cc \
+		   src/MacAddress.cc \
+		   src/MacIpAddress.cc \
+		   src/MasterClient.cc \
+		   src/MasterService.cc \
+		   src/MasterTableMetadata.cc \
+		   src/Memory.cc \
+		   src/MemoryMonitor.cc \
+		   src/MinCopysetsBackupSelector.cc \
+		   src/MultiOp.cc \
+		   src/MultiIncrement.cc \
+		   src/MultiRead.cc \
+		   src/MultiRemove.cc \
+		   src/MultiWrite.cc \
+		   src/MurmurHash3.cc \
+		   src/NetUtil.cc \
+		   src/Object.cc \
+		   src/ObjectBuffer.cc \
+		   src/ObjectFinder.cc \
+		   src/ObjectManager.cc \
+		   src/ObjectRpcWrapper.cc \
+		   src/OptionParser.cc \
+		   src/ParticipantList.cc \
+		   src/PcapFile.cc \
+		   src/PerfCounter.cc \
+		   src/PerfStats.cc \
+		   src/PlusOneBackupSelector.cc \
+		   src/PortAlarm.cc \
+		   src/PreparedOp.cc \
+		   src/RamCloud.cc \
+		   src/RawMetrics.cc \
+		   src/ReplicaManager.cc \
+		   src/ReplicatedSegment.cc \
+		   src/RpcLevel.cc \
+		   src/RpcWrapper.cc \
+		   src/RpcResult.cc \
+		   src/RpcTracker.cc \
+		   src/Seglet.cc \
+		   src/SegletAllocator.cc \
+		   src/Segment.cc \
+		   src/SegmentIterator.cc \
+		   src/SegmentManager.cc \
+		   src/ServerIdRpcWrapper.cc \
+		   src/ServerList.cc \
+		   src/ServerMetrics.cc \
+		   src/Service.cc \
+		   src/ServiceLocator.cc \
+		   src/SessionAlarm.cc \
+		   src/SideLog.cc \
+		   src/SpinLock.cc \
+		   src/Status.cc \
+		   src/StringUtil.cc \
+		   src/TableEnumerator.cc \
+		   src/TableStats.cc \
+		   src/Tablet.cc \
+		   src/TableManager.cc \
+		   src/TabletManager.cc \
+		   src/TaskQueue.cc \
+		   src/TcpTransport.cc \
+		   src/TestLog.cc \
+		   src/ThreadId.cc \
+		   src/TimeCounter.cc \
+		   src/TimeTrace.cc \
+		   src/TimeTraceUtil.cc \
+		   src/TransactionManager.cc \
+		   src/Transport.cc \
+		   src/TransportManager.cc \
+		   src/TxDecisionRecord.cc \
+		   src/TxRecoveryManager.cc \
+		   src/UdpDriver.cc \
+		   src/UnackedRpcResults.cc \
+		   src/Util.cc \
+		   src/WallTime.cc \
+		   src/WireFormat.cc \
+		   src/WorkerManager.cc \
+		   src/WorkerSession.cc \
+		   src/WorkerTimer.cc \
+		   $(INFINIBAND_SRCFILES) \
+		   $(SOLARFLARE_SRC) \
+		   $(DPDK_SRC) \
+		   $(OBJDIR)/EnumerationIterator.pb.cc \
+		   $(OBJDIR)/Histogram.pb.cc \
+		   $(OBJDIR)/LogMetrics.pb.cc \
+		   $(OBJDIR)/MasterRecoveryInfo.pb.cc \
+		   $(OBJDIR)/MetricList.pb.cc \
+		   $(OBJDIR)/ServerConfig.pb.cc \
+		   $(OBJDIR)/ServerList.pb.cc \
+		   $(OBJDIR)/ServerStatistics.pb.cc \
+		   $(OBJDIR)/SpinLockStatistics.pb.cc \
+		   $(OBJDIR)/Tablets.pb.cc \
+		   $(OBJDIR)/Indexlet.pb.cc \
+		   $(OBJDIR)/RecoveryPartition.pb.cc \
+		   $(OBJDIR)/Table.pb.cc \
+		   $(OBJDIR)/TableManager.pb.cc \
+		   $(OBJDIR)/TableConfig.pb.cc \
+		   $(OBJDIR)/CoordinatorUpdateInfo.pb.cc \
+		   $(NULL)
+
+SHARED_OBJFILES := $(SHARED_SRCFILES)
+SHARED_OBJFILES := $(patsubst src/%.cc, $(OBJDIR)/%.o, $(SHARED_OBJFILES))
+SHARED_OBJFILES := $(patsubst $(OBJDIR)/%.cc, $(OBJDIR)/%.o, $(SHARED_OBJFILES))
+
+$(OBJDIR)/RpcLevel.o: $(TOP)/$(OBJDIR)/RpcLevelData.h
+$(TOP)/$(OBJDIR)/RpcLevelData.h: $(TOP)/scripts/genLevels.py $(TOP)/src/WireFormat.h
+	$(TOP)/scripts/genLevels.py > $@
+
+$(OBJDIR)/%.o: $(TOP)/src/%.cc $(AUTO_GEN_HEADERS)
+	@mkdir -p $(@D)
+	$(call run-cxx,$@,$<, -fPIC)
+
+# If there's a cc file in the object dir, build it.
+# This is for auto-generated source code.
+$(OBJDIR)/%.o: $(OBJDIR)/%.cc $(AUTO_GEN_HEADERS)
+	@mkdir -p $(@D)
+	$(call run-cxx,$@,$<, -fPIC)
+
+# rawmetrics.py needs to be run whenever it changes, or any of its input
+# files change (currently only WireFormat.h).
+$(OBJDIR)/RawMetrics.in.cc  $(OBJDIR)/RawMetrics.in.h: $(TOP)/scripts/rawmetrics.py $(TOP)/src/WireFormat.h
+	$(TOP)/scripts/rawmetrics.py
+all:

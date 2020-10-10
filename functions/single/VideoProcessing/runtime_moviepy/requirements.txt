@@ -1,0 +1,4 @@
+moviepy
+redis == 3.5.3
+psutil
+

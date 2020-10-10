@@ -1,0 +1,20 @@
+misc: $(OBJDIR)/misc/crc32c \
+      $(OBJDIR)/misc/memcpy \
+      $(OBJDIR)/misc/modulus \
+      $(OBJDIR)/misc/vmac
+
+$(OBJDIR)/misc/crc32c: $(SHARED_OBJFILES) $(OBJDIR)/misc/crc32c.o
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+$(OBJDIR)/misc/memcpy: $(SHARED_OBJFILES) $(OBJDIR)/misc/memcpy.o
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) $(LIBS) -o $@ $^
+
+$(OBJDIR)/misc/modulus: $(SHARED_OBJFILES) $(OBJDIR)/misc/modulus.o
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+$(OBJDIR)/misc/vmac: $(SHARED_OBJFILES) $(OBJDIR)/misc/vmac.o
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -o $@ $^
